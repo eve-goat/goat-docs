@@ -1,0 +1,211 @@
+---
+title: x402 Payments on GOAT Network
+lang: en-US
+description: Practical onboarding and integration guide for payment-gated apps and AI agents using GOAT x402.
+---
+
+import { Callout } from 'nextra/components'
+
+# x402 Payments on GOAT Network
+
+x402 is a payment protocol for crypto-native applications. It standardizes how an app or API requests payment and how payment settlement is verified before service delivery.
+
+This guide consolidates:
+
+- the official `GOATNetwork/x402` repository,
+- the onboarding workflow from the x402 onboarding PR,
+- integration patterns from GOAT internal x402 implementation knowledge.
+
+## What x402 Enables
+
+- Pay-per-request APIs
+- Payment-gated AI/agent services
+- Checkout flows with on-chain settlement proof
+- Optional callback-driven business logic after payment confirmation
+
+In practice, x402 is a **payment + settlement** layer that can be combined with agent trust/identity layers (for example ERC-8004).
+
+## Repository Map (GOAT x402)
+
+From the official repo:
+
+- `goatx402-sdk` — frontend SDK (EVM wallets)
+- `goatx402-sdk-server-ts` — TypeScript server SDK
+- `goatx402-sdk-server-go` — Go server SDK
+- `goatx402-contract` — callback and token contract examples
+- `goatx402-demo` — end-to-end demo app
+- `DEVELOPER_FAST.md` — concise integration guide
+- `API.md` — API and auth details
+
+## Roles & Responsibilities
+
+| Role | Responsibility |
+|---|---|
+| Admin / Ops | Merchant setup, token/address configuration, fee balance, callback contract registration |
+| Backend developer | Order lifecycle, HMAC-authenticated API calls, status polling, proof retrieval |
+| Frontend developer | Wallet signing + transfer UX, optional calldata signature, payment state UX |
+| User / payer | Signs and submits on-chain payment |
+
+## Integration Boundaries
+
+- **Frontend (`goatx402-sdk`)**: wallet signing and token transfer (EVM)
+- **Backend (`goatx402-sdk-server-*`)**: authenticated Core API calls
+- **Core**: order lifecycle, fee charging/refunds, chain monitoring, settlement state, proof issuance
+
+<Callout type="warning">
+  Keep `GOATX402_API_SECRET` server-side only. Never expose API secrets in frontend code.
+</Callout>
+
+## Payment Modes and Flows
+
+| Mode | Flow Types | User Transfer Target | Callback Support | Typical Use |
+|---|---|---|---|---|
+| DIRECT | `ERC20_DIRECT`, `SOL_DIRECT` | Merchant address | No | Simple payment-gated access |
+| DELEGATE | `ERC20_3009`, `ERC20_APPROVE_XFER`, `SOL_APPROVE_XFER` | TSS / delegated settlement address | Yes | Advanced settlement + callback workflows |
+
+**Key integration fact:** user-side payment always transfers to `payToAddress` returned by order creation.
+
+## Environment Variables (Unified)
+
+```bash
+GOATX402_API_URL=https://api.x402.goat.network
+GOATX402_API_KEY=your_api_key
+GOATX402_API_SECRET=your_api_secret
+GOATX402_MERCHANT_ID=your_merchant_id
+```
+
+## Core Order Lifecycle
+
+1. Frontend requests order creation from your backend.
+2. Backend calls `POST /api/v1/orders`.
+3. Core returns x402 payment-required payload (**HTTP 402 is expected success** for order creation).
+4. If `calldataSignRequest` exists, frontend signs and backend submits signature.
+5. Frontend performs payment to `payToAddress`.
+6. Backend polls order status until terminal state.
+7. Backend retrieves proof on confirmation.
+8. Backend cancels stale/unpaid orders when eligible.
+
+## API Highlights
+
+### Auth
+
+Protected endpoints use HMAC headers:
+
+- `X-API-Key`
+- `X-Timestamp`
+- `X-Sign`
+
+### Endpoint Mapping
+
+| Server SDK Method | Endpoint |
+|---|---|
+| `createOrder` | `POST /api/v1/orders` |
+| `getOrderStatus` | `GET /api/v1/orders/{order_id}` |
+| `getOrderProof` | `GET /api/v1/orders/{order_id}/proof` |
+| `submitCalldataSignature` | `POST /api/v1/orders/{order_id}/calldata-signature` |
+| `cancelOrder` | `POST /api/v1/orders/{order_id}/cancel` |
+| `getMerchant` | `GET /merchants/{merchant_id}` |
+
+### Error Handling Baseline
+
+Treat HTTP status as the primary code:
+
+- `400`: validation / business errors
+- `401`: authentication error
+- `403`: authorization error
+- `404`: not found
+- `500`: internal error
+
+<Callout type="info">
+  `POST /api/v1/orders` returning <strong>402 Payment Required</strong> is a normal success path in x402.
+</Callout>
+
+## Fast Start (Onboarding-Aligned)
+
+### 1) Clone and install
+
+```bash
+git clone https://github.com/GOATNetwork/x402.git
+cd x402
+
+cd goatx402-demo && pnpm install
+cd ../goatx402-sdk-server-ts && pnpm install
+cd ../goatx402-demo
+```
+
+### 2) Configure demo backend
+
+Create `goatx402-demo/.env`:
+
+```bash
+GOATX402_MERCHANT_ID=your_merchant_id
+GOATX402_API_URL=your_x402_api_url
+GOATX402_API_KEY=your_api_key
+GOATX402_API_SECRET=your_api_secret
+PORT=3001
+```
+
+### 3) Run demo
+
+```bash
+pnpm dev
+```
+
+### 4) Verify backend health/config
+
+```bash
+curl http://localhost:3001/api/health
+curl http://localhost:3001/api/config
+```
+
+## Callback Contract (DELEGATE Flows)
+
+If your flow requires callback settlement behavior:
+
+1. Deploy callback contract from `goatx402-contract`
+2. Register callback contract metadata in x402 admin config
+3. Ensure EIP-712 callback metadata is configured and consistent
+4. Verify callback invocation and event logs during payment tests
+
+Reference deployment scripts and tests are provided in:
+
+- `goatx402-contract/README.md`
+- `goatx402-contract/QUICK_START.md`
+- `goatx402-contract/MERCHANT_CALLBACK.md`
+
+## Production Checklist
+
+- Keep API credentials isolated on backend
+- Monitor fee balance (`insufficient fee balance` is a common blocker)
+- Auto-cancel stale `CHECKOUT_VERIFIED` orders
+- Implement robust status polling timeout and retries
+- Retrieve and persist settlement proof for auditability
+- For DELEGATE, verify calldata signature flow and callback reliability
+
+## Skill-Oriented Implementation Tracks (Recommended)
+
+Based on internal x402 integration playbooks, execute in four tracks:
+
+1. **Onboard Track**
+   - Env + SDK setup
+   - First successful `402 -> payment -> confirmed` cycle
+2. **API Guard Track**
+   - Wrap existing endpoints with payment enforcement
+   - Define per-endpoint pricing strategy
+3. **Debug Track**
+   - Standardize handling for auth, config, fee, and chain-state failures
+4. **Observability Track**
+   - Metrics: order-create success rate, confirmation latency, failure reasons, cancellation rate
+
+## References
+
+1. GOAT x402 repository: https://github.com/GOATNetwork/x402
+2. README: https://github.com/GOATNetwork/x402/blob/main/README.md
+3. Developer guide: https://github.com/GOATNetwork/x402/blob/main/DEVELOPER_FAST.md
+4. API reference: https://github.com/GOATNetwork/x402/blob/main/API.md
+5. Demo app README: https://github.com/GOATNetwork/x402/blob/main/goatx402-demo/README.md
+6. Contract README: https://github.com/GOATNetwork/x402/blob/main/goatx402-contract/README.md
+7. Contract quick start: https://github.com/GOATNetwork/x402/blob/main/goatx402-contract/QUICK_START.md
+8. Merchant callback contract notes: https://github.com/GOATNetwork/x402/blob/main/goatx402-contract/MERCHANT_CALLBACK.md
+9. Onboarding PR (in review): https://github.com/GOATNetwork/x402/pull/1
+10. Onboarding file diff reference: https://github.com/GOATNetwork/x402/pull/1/changes#diff-24e1b9b7651bc16edad670e6f99242280daf788d313bb11dd236bb55e73e30b7
