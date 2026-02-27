@@ -25,12 +25,11 @@ This page is an implementation-focused guide for GOAT builders.
 
 ## Official Deployed Contract Sets
 
-From the official ERC-8004 contracts repository, two canonical address sets are actively used across many EVM networks:
+From the official ERC-8004 contracts repository, the canonical mainnet deployment set is actively used across many EVM networks:
 
 | Deployment Set | IdentityRegistry | ReputationRegistry | Typical Networks |
 |---|---|---|---|
-| Mainnet-style | `0x8004A169FB4a3325136EB29fA0ceB6D2e539a432` | `0x8004BAa17C55a88189AE136b182e5fdA19dE9b63` | Ethereum, Base, Arbitrum, Optimism, Polygon, BSC, Avalanche, Scroll, Linea, etc. |
-| Testnet-style | `0x8004A818BFB912233c491871b3d84c89A494BD9e` | `0x8004B663056A597Dffe9eCcC1965A193B7388713` | Ethereum Sepolia, Base Sepolia, Arbitrum Sepolia, Polygon Amoy, BSC Testnet, etc. |
+| Mainnet-style | `0x8004A169FB4a3325136EB29fA0ceB6D2e539a432` | `0x8004BAa17C55a88189AE136b182e5fdA19dE9b63` | GOAT Network, Ethereum, Base, Arbitrum, Optimism, Polygon, BSC, etc. |
 
 <Callout type="warning">
   Validation Registry deployment details may differ by chain and release cycle. Always confirm current deployed contracts in the official repository before production use.
@@ -45,11 +44,6 @@ Verified on GOAT explorer:
 - **IdentityRegistry**: [`0x8004A169FB4a3325136EB29fA0ceB6D2e539a432`](https://explorer.goat.network/address/0x8004A169FB4a3325136EB29fA0ceB6D2e539a432)
 - **ReputationRegistry**: [`0x8004BAa17C55a88189AE136b182e5fdA19dE9b63`](https://explorer.goat.network/address/0x8004BAa17C55a88189AE136b182e5fdA19dE9b63)
 
-### GOAT Testnet3 (Chain ID 48816)
-
-At the canonical testnet pair (`0x8004A818...` and `0x8004B663...`), explorer API checks currently do not show verified contract records on Testnet3.
-
-If your team uses a GOAT-specific testnet deployment, publish the exact addresses here once confirmed.
 
 ## How to Use ERC-8004 (Builder Flow)
 
@@ -62,7 +56,6 @@ Use the official deployment list, then build:
 Examples:
 
 - `eip155:2345:0x8004A169FB4a3325136EB29fA0ceB6D2e539a432`
-- `eip155:48816:{confirmed-testnet-identity-address}`
 
 ### 2) Register an agent (Identity Registry)
 
