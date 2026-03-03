@@ -139,11 +139,24 @@ Create `goatx402-demo/.env`:
 
 ```bash
 GOATX402_MERCHANT_ID=your_merchant_id
-GOATX402_API_URL=your_x402_api_url
+GOATX402_API_URL=https://api.x402.goat.network
 GOATX402_API_KEY=your_api_key
 GOATX402_API_SECRET=your_api_secret
 PORT=3001
 ```
+
+<Callout type="info" emoji="🔑">
+**How to get these credentials:**
+
+| Variable | Description | How to obtain |
+| --- | --- | --- |
+| `GOATX402_MERCHANT_ID` | Your unique merchant identifier | Assigned during merchant onboarding with the GOAT x402 team |
+| `GOATX402_API_URL` | GoatX402 Core API endpoint | Production: `https://api.x402.goat.network` |
+| `GOATX402_API_KEY` | HMAC authentication key | Issued by the GOAT x402 team after merchant registration |
+| `GOATX402_API_SECRET` | HMAC signing secret | Issued together with `API_KEY` — **keep server-side only, never expose in frontend** |
+
+To register as a merchant, contact the GOAT Network team or apply through the [GOAT Network website](https://www.goat.network).
+</Callout>
 
 ### 3) Run demo
 
