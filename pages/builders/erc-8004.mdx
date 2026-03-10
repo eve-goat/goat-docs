@@ -1,7 +1,7 @@
 ---
 title: ERC-8004 for GOAT Network
 lang: en-US
-description: Updated ERC-8004 guide for GOAT builders with standard status, deployed contract addresses, and integration usage.
+description: Builder guide to ERC-8004 on GOAT Network, including current standard status, registry usage, and deployment notes.
 ---
 
 import { Callout } from 'nextra/components'
@@ -10,93 +10,120 @@ import { Callout } from 'nextra/components'
 
 ERC-8004 defines a trust layer for agent ecosystems using three registries:
 
-- **Identity Registry** (agent discovery and ownership)
-- **Reputation Registry** (feedback and scoring signals)
-- **Validation Registry** (third-party verification hooks)
+- **Identity Registry** for agent discovery and ownership
+- **Reputation Registry** for feedback and scoring signals
+- **Validation Registry** for third-party verification workflows
 
-This page is an implementation-focused guide for GOAT builders.
+This page focuses on how GOAT builders should evaluate and integrate the standard today.
 
-## Standard Status (Important)
+## Standard Status
 
 <Callout type="info">
-  ERC-8004 is publicly published in the Ethereum ERC process and has live deployments across multiple EVM networks.
-  In the canonical ERC repository, the current status flag is still <strong>Draft</strong> (not Final), so builders should track spec and contract updates.
+  ERC-8004 is publicly published in the Ethereum ERC process, but the canonical ERC markdown still marks it as <strong>Draft</strong>, not Final. Treat current contracts and docs as implementation-ready but still evolving.
 </Callout>
 
-## Official Deployed Contract Sets
+## Official Contract Deployments
 
-From the official ERC-8004 contracts repository, the canonical mainnet deployment set is actively used across many EVM networks:
+The canonical `erc-8004-contracts` repository documents a shared mainnet-style deployment set for the Identity and Reputation registries:
 
-| Deployment Set | IdentityRegistry | ReputationRegistry | Typical Networks |
-|---|---|---|---|
-| Mainnet-style | `0x8004A169FB4a3325136EB29fA0ceB6D2e539a432` | `0x8004BAa17C55a88189AE136b182e5fdA19dE9b63` | GOAT Network, Ethereum, Base, Arbitrum, Optimism, Polygon, BSC, etc. |
+| Deployment Set | IdentityRegistry | ReputationRegistry | Notes |
+| --- | --- | --- | --- |
+| Mainnet-style | `0x8004A169FB4a3325136EB29fA0ceB6D2e539a432` | `0x8004BAa17C55a88189AE136b182e5fdA19dE9b63` | Used across GOAT Network and other EVM deployments listed in the official README |
 
 <Callout type="warning">
-  Validation Registry deployment details may differ by chain and release cycle. Always confirm current deployed contracts in the official repository before production use.
+  The Validation Registry contract and ABI exist in the canonical repository, but the official ERC-8004 contracts README explicitly notes that the Validation Registry portion is still under active update and discussion with the TEE community. Confirm the deployed address and workflow on your target chain before relying on it in production.
 </Callout>
 
-## GOAT Contract Address Notes
+## GOAT Network Notes
 
-### GOAT Alpha Mainnet (Chain ID 2345)
-
-Verified on GOAT explorer:
+The official deployment list includes GOAT Network in the mainnet-style set above. On GOAT, use these addresses:
 
 - **IdentityRegistry**: [`0x8004A169FB4a3325136EB29fA0ceB6D2e539a432`](https://explorer.goat.network/address/0x8004A169FB4a3325136EB29fA0ceB6D2e539a432)
 - **ReputationRegistry**: [`0x8004BAa17C55a88189AE136b182e5fdA19dE9b63`](https://explorer.goat.network/address/0x8004BAa17C55a88189AE136b182e5fdA19dE9b63)
 
+## Builder Flow
 
-## How to Use ERC-8004 (Builder Flow)
+### 1) Choose the registry for your target chain
 
-### 1) Select registry addresses for your target chain
+Use the Identity Registry address for your chain and construct the `agentRegistry` identifier as:
 
-Use the official deployment list, then build:
+- `eip155:{chainId}:{identityRegistryAddress}`
 
-- `agentRegistry = eip155:{chainId}:{identityRegistryAddress}`
-
-Examples:
+Example on GOAT:
 
 - `eip155:2345:0x8004A169FB4a3325136EB29fA0ceB6D2e539a432`
 
-### 2) Register an agent (Identity Registry)
+### 2) Register the agent in Identity Registry
 
-Core operations:
+The canonical implementation supports three registration entry points:
 
+- `register()`
 - `register(agentURI)`
+- `register(agentURI, metadata)`
+
+Useful follow-up methods include:
+
 - `setAgentURI(agentId, newURI)`
-- optional metadata and wallet methods depending on implementation version
+- `getMetadata(agentId, metadataKey)`
+- `setMetadata(agentId, metadataKey, metadataValue)`
+- `setAgentWallet(agentId, newWallet, deadline, signature)`
+- `unsetAgentWallet(agentId)`
 
-`agentURI` should resolve to a registration JSON file (IPFS or HTTPS recommended).
+`agentURI` should resolve to a registration JSON document, typically over IPFS or HTTPS.
 
-### 3) Submit reputation signals (Reputation Registry)
+<Callout type="info">
+  `agentWallet` is a reserved payment-receiving field in the spec. It defaults to the owner wallet on registration and should be changed with `setAgentWallet(...)`, not by writing generic metadata.
+</Callout>
 
-Core operation:
+### 3) Publish a registration JSON that matches the spec
+
+In the current ERC-8004 spec, the following top-level fields are expected in the registration document:
+
+- `type`
+- `name`
+- `description`
+- `image`
+- `services`
+- `x402Support`
+- `active`
+- `registrations`
+
+`supportedTrust` is optional.
+
+### 4) Collect trust signals through Reputation Registry
+
+Primary write path:
 
 - `giveFeedback(agentId, value, valueDecimals, tag1, tag2, endpoint, feedbackURI, feedbackHash)`
 
-Read paths typically include:
+Common read paths:
 
 - `readFeedback(...)`
 - `readAllFeedback(...)`
 - `getSummary(...)`
 
-### 4) Add validation proofs (Validation Registry, where deployed)
+For production integrations, keep the on-chain record compact and store richer evidence off-chain behind `feedbackURI`, with `feedbackHash` when you need integrity verification.
 
-Typical workflow:
+### 5) Use Validation Registry only when the deployment is confirmed
 
-- `validationRequest(...)`
-- `validationResponse(...)`
+The canonical contracts expose:
 
-### 5) Combine with payment rails
+- `validationRequest(validatorAddress, agentId, requestURI, requestHash)`
+- `validationResponse(requestHash, response, responseURI, responseHash, tag)`
 
-ERC-8004 is a trust and discovery layer. Payment and settlement (for example x402-style flows) are complementary and should be integrated as a separate layer.
+That interface is usable, but the surrounding Validation Registry section is still evolving. Confirm the address, trust model, and validator process on your target chain before shipping.
 
-## Minimal Registration JSON Example
+### 6) Combine ERC-8004 with payment rails when needed
+
+ERC-8004 is a trust and discovery layer. If your agent also charges for access, combine it with a payment protocol such as x402 rather than treating ERC-8004 itself as the payment layer.
+
+## Registration JSON Example
 
 ```json
 {
   "type": "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
   "name": "GoatAgent",
-  "description": "Autonomous service agent on GOAT",
+  "description": "Autonomous service agent on GOAT Network",
   "image": "https://example.com/agent.png",
   "services": [
     {
@@ -110,6 +137,8 @@ ERC-8004 is a trust and discovery layer. Payment and settlement (for example x40
       "version": "2025-06-18"
     }
   ],
+  "x402Support": true,
+  "active": true,
   "registrations": [
     {
       "agentRegistry": "eip155:2345:0x8004A169FB4a3325136EB29fA0ceB6D2e539a432",
@@ -120,21 +149,24 @@ ERC-8004 is a trust and discovery layer. Payment and settlement (for example x40
 }
 ```
 
+If you are using ERC-8004 only for discovery, you can omit `supportedTrust` or leave it empty. Set `x402Support` to reflect your real payment capabilities rather than treating it as a decorative field.
+
 ## Operational Recommendations
 
-1. **Treat registration as identity, not automatic trust.**
-2. **Use anti-Sybil logic** for production reputation views.
-3. **Store off-chain evidence with URI + hash** for integrity.
-4. **Use stronger validation models** as value-at-risk increases.
-5. **Pin implementation to audited contract releases** and monitor ERC updates.
+1. **Treat registration as discoverability, not automatic trust.**
+2. **Pin the registration JSON and any feedback evidence** to stable storage such as IPFS when possible.
+3. **Use `feedbackURI` + `feedbackHash`** for auditable off-chain evidence.
+4. **Set a verified agent receiving wallet** with `setAgentWallet(...)` when payments should not go to the owner address.
+5. **Track spec and contract updates** because ERC-8004 is still Draft.
 
 ## References
 
 1. ERC-8004 page (Ethereum EIPs): https://eips.ethereum.org/EIPS/eip-8004
-2. Canonical ERC markdown (status field): https://raw.githubusercontent.com/ethereum/ERCs/master/ERCS/erc-8004.md
+2. Canonical ERC markdown: https://raw.githubusercontent.com/ethereum/ERCs/master/ERCS/erc-8004.md
 3. ERC-8004 contracts repository: https://github.com/erc-8004/erc-8004-contracts
-4. ERC-8004 contracts README (deployment list): https://raw.githubusercontent.com/erc-8004/erc-8004-contracts/main/README.md
-5. ERC-8004 ABIs directory: https://github.com/erc-8004/erc-8004-contracts/tree/main/abis
-6. GOAT mainnet Identity address page: https://explorer.goat.network/address/0x8004A169FB4a3325136EB29fA0ceB6D2e539a432
-7. GOAT mainnet Reputation address page: https://explorer.goat.network/address/0x8004BAa17C55a88189AE136b182e5fdA19dE9b63
-8. GOAT x402 repository: https://github.com/GOATNetwork/x402
+4. ERC-8004 contracts README: https://raw.githubusercontent.com/erc-8004/erc-8004-contracts/main/README.md
+5. ERC-8004 spec file: https://github.com/erc-8004/erc-8004-contracts/blob/main/ERC8004SPEC.md
+6. ERC-8004 ABIs directory: https://github.com/erc-8004/erc-8004-contracts/tree/main/abis
+7. GOAT IdentityRegistry explorer page: https://explorer.goat.network/address/0x8004A169FB4a3325136EB29fA0ceB6D2e539a432
+8. GOAT ReputationRegistry explorer page: https://explorer.goat.network/address/0x8004BAa17C55a88189AE136b182e5fdA19dE9b63
+9. GOAT x402 repository: https://github.com/GOATNetwork/x402
